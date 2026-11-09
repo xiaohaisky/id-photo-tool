@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>1寸证件照制作工具</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    background: #f5f7fa;
+    color: #333;
+    min-height: 100vh;
+    padding: 20px;
+  }
+  .container { max-width: 900px; margin: 0 auto; }
+  h1 {
+    text-align: center;
+    font-size: 24px;
+    font-weight: 600;
+    margin-bottom: 8px;
+    color: #1a1a1a;
+  }
+  .subtitle {
+    text-align: center;
+    color: #666;
+    font-size: 14px;
+    margin-bottom: 24px;
+  }
+  .upload-zone {
+    border: 2px dashed #ccc;
+    border-radius: 12px;
+    padding: 48px 24px;
+    text-align: center;
+    background: #fff;
+    cursor: pointer;
+    transition: all 0.2s;
+    margin-bottom: 24px;
+  }
+  .upload-zone:hover, .upload-zone.dragover {
+    border-color: #4a90d9;
+    background: #f0f7ff;
+  }
+  .upload-icon {
+    width: 48px; height: 48px;
+    margin: 0 auto 12px;
+    color: #999;
+  }
+  .upload-text { font-size: 16px; color: #666; margin-bottom: 4px; }
+  .upload-hint { font-size: 13px; color: #999; }
+  .workspace { display: none; }
+  .workspace.active { display: block; }
+  .preview-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 20px;
+  }
+  @media (max-width: 600px) {
+    .preview-grid { grid-template-columns: 1fr; }
+  }
+  .preview-card {
+    background: #fff;
+    border-radius: 10px;
+    padding: 16px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+  }
+  .preview-label {
+    font-size: 13px;
+    font-weight: 500;
+    color: #666;
+    margin-bottom: 10px;
+  }
+  .preview-canvas-wrap {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 200px;
+    background: #fafafa;
+    border-radius: 6px;
+    padding: 12px;
+  }
+  canvas {
+    max-width: 100%;
+    max-height: 320px;
+    display: block;
+  }
+  .toolbar {
+    background: #fff;
+    border-radius: 10px;
+    padding: 16px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+    margin-bottom: 16px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    align-items: center;
+  }
+  .tool-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .tool-label { font-size: 13px; color: #666; }
+  .btn {
+    padding: 8px 16px;
+    border: none;
+    border-radius: 6px;
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.15s;
+    font-weight: 500;
+  }
+  .btn-secondary {
+    background: #f0f0f0;
+    color: #333;
+  }
+  .btn-secondary:hover { background: #e5e5e5; }
+  .btn-success {
+    background: #52c41a;
+    color: #fff;
+  }
+  .btn-success:hover { background: #45a816; }
+  .info-bar {
+    background: #fff;
+    border-radius: 10px;
+    padding: 14px 16px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+    font-size: 13px;
+    color: #666;
+    line-height: 1.8;
+  }
+  .info-bar strong { color: #333; }
+  .info-item { display: inline-block; margin-right: 24px; }
+  .erase-hint {
+    display: none;
+    background: #fff7e6;
+    border: 1px solid #ffd591;
+    border-radius: 6px;
+    padding: 10px 14px;
+    font-size: 13px;
+    color: #d46b08;
+    margin-bottom: 16px;
+  }
+  .erase-hint.active { display: block; }
+  input[type="range"] { width: 100px; }
+  input[type="file"] { display: none; }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>1寸证件照制作工具</h1>
+  <p class="subtitle">蓝底自动换白底 · 尺寸自动调整 · 压缩至 190KB 以内</p>
+  <div class="upload-zone" id="uploadZone">
+    <svg class="upload-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+      <polyline points="17 8 12 3 7 8"/>
+      <line x1="12" y1="3" x2="12" y2="15"/>
+    </svg>
+    <div class="upload-text">点击或拖拽上传照片</div>
+    <div class="upload-hint">支持 JPG / PNG 格式，自动处理为标准 1 寸白底证件照</div>
+  </div>
+  <input type="file" id="fileInput" accept="image/*">
+  <div class="workspace" id="workspace">
+    <div class="erase-hint" id="eraseHint">
+      擦除模式：在处理后图片上涂抹要移除的区域（如徽章、污渍），松开工后自动修复
+    </div>
+    <div class="preview-grid">
+      <div class="preview-card">
+        <div class="preview-label">原图</div>
+        <div class="preview-canvas-wrap">
+          <canvas id="originalCanvas"></canvas>
+        </div>
+      </div>
+      <div class="preview-card">
+        <div class="preview-label">处理后（295×413px）</div>
+        <div class="preview-canvas-wrap">
+          <canvas id="resultCanvas"></canvas>
+        </div>
+      </div>
+    </div>
+    <div class="toolbar">
+      <div class="tool-group">
+        <button class="btn btn-secondary" id="btnErase">擦除工具</button>
+        <span class="tool-label">画笔大小：</span>
+        <input type="range" id="brushSize" min="10" max="80" value="30">
+      </div>
+      <div class="tool-group" style="margin-left: auto;">
+        <button class="btn btn-secondary" id="btnReset">重新上传</button>
+        <button class="btn btn-success" id="btnDownload">下载证件照</button>
+      </div>
+    </div>
+    <div class="info-bar">
+      <span class="info-item">输出尺寸：<strong id="infoSize">295 × 413 px</strong></span>
+      <span class="info-item">文件大小：<strong id="infoFileSize">--</strong></span>
+      <span class="info-item">格式：<strong>JPG</strong></span>
+      <span class="info-item">背景：<strong>白色</strong></span>
+    </div>
+  </div>
+</div>
+<script>
+(function() {
+  const uploadZone = document.getElementById('uploadZone');
+  const fileInput = document.getElementById('fileInput');
+  const workspace = document.getElementById('workspace');
+  const originalCanvas = document.getElementById('originalCanvas');
+  const resultCanvas = document.getElementById('resultCanvas');
+  const ctxOrig = originalCanvas.getContext('2d');
+  const ctxResult = resultCanvas.getContext('2d');
+  const btnErase = document.getElementById('btnErase');
+  const btnReset = document.getElementById('btnReset');
+  const btnDownload = document.getElementById('btnDownload');
+  const brushSize = document.getElementById('brushSize');
+  const eraseHint = document.getElementById('eraseHint');
+  const infoFileSize = document.getElementById('infoFileSize');
+  let originalImage = null;
+  let processedImageData = null;
+  let isErasing = false;
+  let eraseMode = false;
+  const TARGET_W = 295;
+  const TARGET_H = 413;
+  const MAX_SIZE = 190 * 1024;
+  uploadZone.addEventListener('click', () => fileInput.click());
+  fileInput.addEventListener('change', (e) => {
+    if (e.target.files[0]) handleFile(e.target.files[0]);
+  });
+  uploadZone.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    uploadZone.classList.add('dragover');
+  });
+  uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('dragover'));
+  uploadZone.addEventListener('drop', (e) => {
+    e.preventDefault();
+    uploadZone.classList.remove('dragover');
+    if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
+  });
+  function handleFile(file) {
+    const img = new Image();
+    img.onload = () => {
+      originalImage = img;
+      uploadZone.style.display = 'none';
+      workspace.classList.add('active');
+      processImage();
+    };
+    img.src = URL.createObjectURL(file);
+  }
+  function processImage() {
+    drawOriginal();
+    const cropped = cropToRatio(originalImage, TARGET_W / TARGET_H);
+    const scaled = scaleToSize(cropped, TARGET_W, TARGET_H);
+    const whitened = replaceBlueBackground(scaled);
+    processedImageData = whitened;
+    ctxResult.canvas.width = TARGET_W;
+    ctxResult.canvas.height = TARGET_H;
+    ctxResult.putImageData(processedImageData, 0, 0);
+    updateFileSize();
+  }
+  function drawOriginal() {
+    const maxW = 400, maxH = 320;
+    const ratio = Math.min(maxW / originalImage.width, maxH / originalImage.height);
+    const w = originalImage.width * ratio;
+    const h = originalImage.height * ratio;
+    originalCanvas.width = w;
+    originalCanvas.height = h;
+    ctxOrig.drawImage(originalImage, 0, 0, w, h);
+  }
+  function cropToRatio(img, targetRatio) {
+    const w = img.width, h = img.height;
+    const origRatio = w / h;
+    let newW, newH;
+    if (origRatio > targetRatio) {
+      newH = h;
+      newW = h * targetRatio;
+    } else {
+      newW = w;
+      newH = w / targetRatio;
+    }
+    const startX = (w - newW) / 2;
+    const startY = (h - newH) * 0.3;
+    const canvas = document.createElement('canvas');
+    canvas.width = newW;
+    canvas.height = newH;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(img, startX, startY, newW, newH, 0, 0, newW, newH);
+    return canvas;
+  }
+  function scaleToSize(canvas, w, h) {
+    const scaled = document.createElement('canvas');
+    scaled.width = w;
+    scaled.height = h;
+    const ctx = scaled.getContext('2d');
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(canvas, 0, 0, w, h);
+    return scaled;
+  }
+  function replaceBlueBackground(canvas) {
+    const ctx = canvas.getContext('2d');
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const data = imageData.data;
+    for (let i = 0; i < data.length; i += 4) {
+      const r = data[i];
+      const g = data[i + 1];
+      const b = data[i + 2];
+      if (b > 200 && g > 150 && r > 80 && b > r + 50 && b > g + 20) {
+        data[i] = 255;
+        data[i + 1] = 255;
+        data[i + 2] = 255;
+      }
+    }
+    smoothEdges(data, canvas.width, canvas.height);
+    return imageData;
+  }
+  function smoothEdges(data, w, h) {
+    for (let y = 1; y < h - 1; y++) {
+      for (let x = 1; x < w - 1; x++) {
+        const idx = (y * w + x) * 4;
+        const r = data[idx], g = data[idx + 1], b = data[idx + 2];
+        const isNearBg = b > 180 && g > 130 && r > 60;
+        if (isNearBg) {
+          const left = data[(y * w + x - 1) * 4];
+          const right = data[(y * w + x + 1) * 4];
+          const top = data[((y - 1) * w + x) * 4];
+          const bottom = data[((y + 1) * w + x) * 4];
+          const bgCount = [left, right, top, bottom].filter(v => v > 240).length;
+          if (bgCount >= 3) {
+            const blend = 0.5;
+            data[idx] = r * (1 - blend) + 255 * blend;
+            data[idx + 1] = g * (1 - blend) + 255 * blend;
+            data[idx + 2] = b * (1 - blend) + 255 * blend;
+          }
+        }
+      }
+    }
+  }
+  btnErase.addEventListener('click', () => {
+    eraseMode = !eraseMode;
+    eraseHint.classList.toggle('active', eraseMode);
+    btnErase.textContent = eraseMode ? '退出擦除' : '擦除工具';
+    btnErase.style.background = eraseMode ? '#ff4d4f' : '#f0f0f0';
+    btnErase.style.color = eraseMode ? '#fff' : '#333';
+  });
+  resultCanvas.addEventListener('mousedown', startErase);
+  resultCanvas.addEventListener('touchstart', (e) => {
+    e.preventDefault();
+    const touch = e.touches[0];
+    const rect = resultCanvas.getBoundingClientRect();
+    startErase({
+      offsetX: (touch.clientX - rect.left) * (TARGET_W / rect.width),
+      offsetY: (touch.clientY - rect.top) * (TARGET_H / rect.height)
+    });
+  });
+  resultCanvas.addEventListener('mousemove', (e) => {
+    if (!isErasing) return;
+    const rect = resultCanvas.getBoundingClientRect();
+    const x = (e.clientX - rect.left) * (TARGET_W / rect.width);
+    const y = (e.clientY - rect.top) * (TARGET_H / rect.height);
+    eraseAt(x, y);
+  });
+  resultCanvas.addEventListener('touchmove', (e) => {
+    if (!isErasing) return;
+    e.preventDefault();
+    const touch = e.touches[0];
+    const rect = resultCanvas.getBoundingClientRect();
+    const x = (touch.clientX - rect.left) * (TARGET_W / rect.width);
+    const y = (touch.clientY - rect.top) * (TARGET_H / rect.height);
+    eraseAt(x, y);
+  });
+  document.addEventListener('mouseup', stopErase);
+  document.addEventListener('touchend', stopErase);
+  function startErase(e) {
+    if (!eraseMode) return;
+    isErasing = true;
+    eraseAt(e.offsetX, e.offsetY);
+  }
+  function stopErase() {
+    if (isErasing) {
+      isErasing = false;
+      updateFileSize();
+    }
+  }
+  function eraseAt(x, y) {
+    const radius = parseInt(brushSize.value) / 2;
+    const data = processedImageData.data;
+    const w = TARGET_W, h = TARGET_H;
+    const cx = Math.round(x), cy = Math.round(y);
+    const r = Math.round(radius);
+    let sumR = 0, sumG = 0, sumB = 0, count = 0;
+    const sampleRadius = r + 5;
+    for (let dy = -sampleRadius; dy <= sampleRadius; dy++) {
+      for (let dx = -sampleRadius; dx <= sampleRadius; dx++) {
+        const px = cx + dx, py = cy + dy;
+        if (px < 0 || px >= w || py < 0 || py >= h) continue;
+        const dist = Math.sqrt(dx*dx + dy*dy);
+        if (dist > sampleRadius || dist < r) continue;
+        const idx = (py * w + px) * 4;
+        sumR += data[idx];
+        sumG += data[idx + 1];
+        sumB += data[idx + 2];
+        count++;
+      }
+    }
+    if (count === 0) return;
+    const avgR = sumR / count;
+    const avgG = sumG / count;
+    const avgB = sumB / count;
+    for (let dy = -r; dy <= r; dy++) {
+      for (let dx = -r; dx <= r; dx++) {
+        const px = cx + dx, py = cy + dy;
+        if (px < 0 || px >= w || py < 0 || py >= h) continue;
+        const dist = Math.sqrt(dx*dx + dy*dy);
+        if (dist > r) continue;
+        const alpha = dist > r - 3 ? (r - dist) / 3 : 1;
+        const idx = (py * w + px) * 4;
+        data[idx] = data[idx] * (1 - alpha) + avgR * alpha;
+        data[idx + 1] = data[idx + 1] * (1 - alpha) + avgG * alpha;
+        data[idx + 2] = data[idx + 2] * (1 - alpha) + avgB * alpha;
+      }
+    }
+    ctxResult.putImageData(processedImageData, 0, 0);
+  }
+  function updateFileSize() {
+    let quality = 0.95;
+    let dataUrl = '';
+    while (quality >= 0.3) {
+      ctxResult.putImageData(processedImageData, 0, 0);
+      dataUrl = resultCanvas.toDataURL('image/jpeg', quality);
+      const size = Math.round((dataUrl.length - 22) * 3 / 4);
+      if (size <= MAX_SIZE) break;
+      quality -= 0.05;
+    }
+    const finalSize = Math.round((dataUrl.length - 22) * 3 / 4);
+    infoFileSize.textContent = (finalSize / 1024).toFixed(1) + ' KB';
+  }
+  btnDownload.addEventListener('click', () => {
+    let quality = 0.95;
+    let dataUrl = '';
+    while (quality >= 0.3) {
+      dataUrl = resultCanvas.toDataURL('image/jpeg', quality);
+      const size = Math.round((dataUrl.length - 22) * 3 / 4);
+      if (size <= MAX_SIZE) break;
+      quality -= 0.05;
+    }
+    const link = document.createElement('a');
+    link.download = '1寸白底证件照.jpg';
+    link.href = dataUrl;
+    link.click();
+  });
+  btnReset.addEventListener('click', () => {
+    workspace.classList.remove('active');
+    uploadZone.style.display = 'block';
+    fileInput.value = '';
+    processedImageData = null;
+    eraseMode = false;
+    eraseHint.classList.remove('active');
+    btnErase.textContent = '擦除工具';
+    btnErase.style.background = '#f0f0f0';
+    btnErase.style.color = '#333';
+  });
+})();
+</script>
+</body>
+</html>
